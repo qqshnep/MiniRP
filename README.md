@@ -1,25 +1,10 @@
 # MiniRP
-## Step05:平行光
+## Step06:Forward 多光源
 
-### 1. Lambert公式
-```
-float4 Frag(Varyings input) : SV_Target
-{
-    float3 N = normalize(input.normalWS);
+### 1. 1个平行光 + 2个点光（最多4个）
+![image](https://github.com/qqshnep/MiniRP/blob/step06/readme_img/step06/01.png)
 
-    float3 L = normalize(_MainLightDirection.xyz);
-
-    //Lambert
-    float NdotL = saturate(dot(N, L));
-
-    float3 color = _BaseColor.rgb * _MainLightColor.rgb * NdotL;
-
-    return float4( color, _BaseColor.a);
-}
-```
-
-### 2. FrameDebuger
-光照是在 Draw Mesh 的时候直接计算的，所以FrameDebugger里不会出现新的Draw Event
-![image](https://github.com/qqshnep/MiniRP/blob/step05/readme_img/step05/01.png)
+### 2. Forward 多光源性能
+每像素 逐灯光遍历，性能差，待后续实现 Forward+ 版本
 
    
