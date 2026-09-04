@@ -5,6 +5,8 @@ using UnityEngine.Rendering.RendererUtils;
 
 public class MiniRenderPipeline : RenderPipeline
 {
+    private readonly Lighting lighting = new Lighting();
+
     protected override void Render(ScriptableRenderContext context, List<Camera> cameras)
     {
         foreach (Camera camera in cameras)
@@ -26,6 +28,10 @@ public class MiniRenderPipeline : RenderPipeline
 
         // 执行剔除
         CullingResults cullingResults = context.Cull(ref cullingParameters);
+
+        // 光照
+        lighting.Setup(context, cullingResults);
+
 
         // 设置 Camera GPU 状态
         context.SetupCameraProperties(camera);
@@ -62,7 +68,7 @@ public class MiniRenderPipeline : RenderPipeline
 
     private void DrawOpaque(ScriptableRenderContext context, Camera camera,CullingResults cullingResults)
     {
-        ShaderTagId shaderTagId = new ShaderTagId("MiniRPUnlit");
+        ShaderTagId shaderTagId = new ShaderTagId("MiniRPLit");
 
         RendererListDesc desc = new RendererListDesc(
                 shaderTagId,
