@@ -1,5 +1,5 @@
 # MiniRP
-## Step01:新增管线
+## Step01:接管 Unity 渲染
 
 ### 1. 创建项目
 ![image](https://github.com/qqshnep/MiniRP/blob/step01/readme_img/step01/01.jpg)
