@@ -94,10 +94,35 @@ Shader "MiniRP/MiniLit"
             //shadow
             TEXTURE2D_SHADOW(_MainLightShadowmap);
             SAMPLER_CMP(sampler_MainLightShadowmap);
-            float4x4 _MainLightWorldToShadow;
+            //float4x4 _MainLightWorldToShadow;
             float _MainLightShadowStrength;
             float _MainLightShadowNormalBias;
             float4 _MainLightShadowmapSize;
+
+            
+            //cascade shadow
+            #define MAX_CASCADE_COUNT 4
+            float4x4 _MainLightShadowMatrices[MAX_CASCADE_COUNT];
+            float4 _CascadeCullingSpheres[MAX_CASCADE_COUNT];
+            int _CascadeCount;
+
+
+            int GetCascadeIndex(float3 positionWS)
+            {
+                for (int i = 0; i < _CascadeCount; i++)
+                {
+                    float3 offset = positionWS - _CascadeCullingSpheres[i].xyz;
+
+                    float distanceSquared = dot(offset, offset);
+
+                    if ( distanceSquared < _CascadeCullingSpheres[i].w)
+                    {
+                        return i;
+                    }
+                }
+
+                return -1;
+            }
 
 
             float SampleMainShadow(float3 shadowCoord)
@@ -127,35 +152,33 @@ Shader "MiniRP/MiniLit"
 
             float GetMainLightShadow(float3 positionWS, float3 normalWS, float3 lightDirection)
             {
-                float NdotL = saturate( dot( normalWS, lightDirection));
-                float inverseNdotL = 1.0 - NdotL;
-
-                float3 biasedPositionWS = positionWS + normalWS * _MainLightShadowNormalBias * inverseNdotL;
-
-
-
-                float4 shadowCoord = mul( _MainLightWorldToShadow, float4(biasedPositionWS, 1.0) );
-
-                shadowCoord.xyz /= shadowCoord.w;
-
-
-                if (shadowCoord.x < 0.0 ||
-                    shadowCoord.x > 1.0 ||
-                    shadowCoord.y < 0.0 ||
-                    shadowCoord.y > 1.0 ||
-                    shadowCoord.z < 0.0 ||
-                    shadowCoord.z > 1.0)
+                int cascadeIndex = GetCascadeIndex(positionWS);
+                if(cascadeIndex < 0)
                 {
                     return 1.0;
                 }
 
 
-                //float shadow = SampleMainShadow(shadowCoord.xyz);
-                float shadow = SampleMainShadowPCF3x3(shadowCoord.xyz);
+                // normal bias
+                float NdotL = saturate( dot( normalWS, lightDirection));
+                float inverseNdotL = 1.0 - NdotL;
+                float3 biasedPositionWS = positionWS + normalWS * _MainLightShadowNormalBias * inverseNdotL;
+
+
+
+                //float4 shadowCoord = mul( _MainLightWorldToShadow, float4(biasedPositionWS, 1.0) );
+                float4 shadowCoord = mul( _MainLightShadowMatrices[cascadeIndex], float4(biasedPositionWS, 1.0) );
+
+                shadowCoord.xyz /= shadowCoord.w;
+
+
+                float shadow = SampleMainShadow(shadowCoord.xyz);
+                //float shadow = SampleMainShadowPCF3x3(shadowCoord.xyz);
 
                 //1=有光（光源视角可见）
                 return lerp(1.0, shadow, _MainLightShadowStrength);
             }
+
 
 
             Varyings Vert(Attributes input)
@@ -176,6 +199,34 @@ Shader "MiniRP/MiniLit"
 
             float4 Frag(Varyings input) : SV_Target
             {
+                //cascade debug
+                // {
+                //     int cascadeIndex = GetCascadeIndex(input.posWS);
+
+                //     if (cascadeIndex == 0)
+                //     {
+                //         return float4(1,0,0,1);
+                //     }
+
+                //     if (cascadeIndex == 1)
+                //     {
+                //         return float4(0,1,0,1);
+                //     }
+
+                //     if (cascadeIndex == 2)
+                //     {
+                //         return float4(0,0,1,1);
+                //     }
+
+                //     if (cascadeIndex == 3)
+                //     {
+                //         return float4(1,1,0,1);
+                //     }
+
+                //     return float4(0,0,0,1);
+                // }
+
+
                 float3 N = normalize(input.normalWS);
 
                 //平行光
