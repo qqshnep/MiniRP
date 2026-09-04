@@ -26,6 +26,8 @@
 ### 7. 级联阴影 Cascade Shadow
 ![image](https://github.com/qqshnep/MiniRP/blob/step07/readme_img/step07/12.png)
 
-### 7. 最终效果
+### 8. 最终效果
 ![image](https://github.com/qqshnep/MiniRP/blob/step07/readme_img/step07/13.png)
 
+### 9. TODO 
+Shadow Atlas 收尾：处理 Atlas PCF 越界、Cascade Blend、Cascade 边界、稳定性/shimmering
