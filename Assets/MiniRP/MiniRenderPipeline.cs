@@ -68,6 +68,7 @@ public class MiniRenderPipeline : RenderPipeline
 
         desc.renderQueueRange = RenderQueueRange.opaque;
 
+        //排序，从前到后
         desc.sortingCriteria = SortingCriteria.CommonOpaque;
 
         RendererList rendererList = context.CreateRendererList(desc);
