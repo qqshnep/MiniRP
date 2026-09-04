@@ -25,7 +25,9 @@ Shader "MiniRP/MiniLit"
             #pragma vertex Vert
             #pragma fragment Frag
 
-            #include "UnityCG.cginc"
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Input.hlsl"
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
 
             struct Attributes
             {
@@ -59,7 +61,7 @@ Shader "MiniRP/MiniLit"
             // =========================
 
             float4 _MainLightDirection;
-            float4 _MainLightColor;
+            float4 _MainLightClr;
 
 
             #define MAX_OTHER_LIGHT_COUNT 4
@@ -89,17 +91,84 @@ Shader "MiniRP/MiniLit"
             }
 
 
+            //shadow
+            TEXTURE2D_SHADOW(_MainLightShadowmap);
+            SAMPLER_CMP(sampler_MainLightShadowmap);
+            float4x4 _MainLightWorldToShadow;
+            float _MainLightShadowStrength;
+            float _MainLightShadowNormalBias;
+            float4 _MainLightShadowmapSize;
+
+
+            float SampleMainShadow(float3 shadowCoord)
+            {
+                return SAMPLE_TEXTURE2D_SHADOW(_MainLightShadowmap, sampler_MainLightShadowmap, shadowCoord);
+            }
+
+            float SampleMainShadowPCF3x3(float3 shadowCoord)
+            {
+                float2 texelSize =  _MainLightShadowmapSize.xy;
+
+                float shadow = 0.0;
+
+                for (int y = -1; y <= 1; y++)
+                {
+                    for (int x = -1; x <= 1; x++)
+                    {
+                        float2 offset = float2(x, y) * texelSize;
+
+                        float3 uvz = float3(shadowCoord.xy + offset,shadowCoord.z);
+                        shadow += SAMPLE_TEXTURE2D_SHADOW(_MainLightShadowmap, sampler_MainLightShadowmap, uvz);
+                    }
+                }
+
+                return shadow / 9.0;
+            }
+
+            float GetMainLightShadow(float3 positionWS, float3 normalWS, float3 lightDirection)
+            {
+                float NdotL = saturate( dot( normalWS, lightDirection));
+                float inverseNdotL = 1.0 - NdotL;
+
+                float3 biasedPositionWS = positionWS + normalWS * _MainLightShadowNormalBias * inverseNdotL;
+
+
+
+                float4 shadowCoord = mul( _MainLightWorldToShadow, float4(biasedPositionWS, 1.0) );
+
+                shadowCoord.xyz /= shadowCoord.w;
+
+
+                if (shadowCoord.x < 0.0 ||
+                    shadowCoord.x > 1.0 ||
+                    shadowCoord.y < 0.0 ||
+                    shadowCoord.y > 1.0 ||
+                    shadowCoord.z < 0.0 ||
+                    shadowCoord.z > 1.0)
+                {
+                    return 1.0;
+                }
+
+
+                //float shadow = SampleMainShadow(shadowCoord.xyz);
+                float shadow = SampleMainShadowPCF3x3(shadowCoord.xyz);
+
+                //1=有光（光源视角可见）
+                return lerp(1.0, shadow, _MainLightShadowStrength);
+            }
+
+
             Varyings Vert(Attributes input)
             {
                 Varyings output;
 
-                float4 posWS = mul(unity_ObjectToWorld, input.posOS);
-                output.posWS = posWS.xyz;
+                float3 posWS = TransformObjectToWorld(input.posOS.xyz);
+                output.posWS = posWS;
 
 
-                output.posCS = UnityObjectToClipPos(input.posOS);
+                output.posCS = TransformWorldToHClip(posWS);
 
-                output.normalWS = UnityObjectToWorldNormal(input.normalOS);
+                output.normalWS = TransformObjectToWorldNormal(input.normalOS);
 
                 return output;
             }
@@ -112,7 +181,8 @@ Shader "MiniRP/MiniLit"
                 //平行光
                 float3 L = normalize(_MainLightDirection.xyz);
                 float mainNdotL  = saturate(dot(N, L));
-                float3 lighting = _BaseColor.rgb * _MainLightColor.rgb * mainNdotL;
+                float shadow = GetMainLightShadow(input.posWS, input.normalWS, L);
+                float3 lighting = _BaseColor.rgb * _MainLightClr.rgb * mainNdotL * shadow;
 
                 //点光
                 for (int i = 0; i < _OtherLightCount;i++)
@@ -124,6 +194,63 @@ Shader "MiniRP/MiniLit"
                 float3 color = _BaseColor.rgb * lighting;
 
                 return float4( color, _BaseColor.a );
+            }
+
+            ENDHLSL
+        }
+
+
+        Pass
+        {
+            Name "ShadowCaster"
+
+            Tags
+            {
+                "LightMode" = "ShadowCaster"
+            }
+
+            ZWrite On
+            ZTest LEqual
+            ColorMask 0 //不需要写 Color
+
+            HLSLPROGRAM
+
+            #pragma vertex ShadowVert
+            #pragma fragment ShadowFrag
+
+            #include "UnityCG.cginc"
+
+            CBUFFER_START(UnityPerMaterial)
+
+            float4 _BaseColor;
+
+            CBUFFER_END
+
+
+            struct Attributes
+            {
+                float4 posOS : POSITION;
+            };
+
+            struct Varyings
+            {
+                float4 posCS : SV_POSITION;
+            };
+
+
+            Varyings ShadowVert(Attributes input)
+            {
+                Varyings output;
+
+                output.posCS = UnityObjectToClipPos(input.posOS);
+
+                return output;
+            }
+
+
+            float4 ShadowFrag() : SV_Target
+            {
+                return 0;
             }
 
             ENDHLSL

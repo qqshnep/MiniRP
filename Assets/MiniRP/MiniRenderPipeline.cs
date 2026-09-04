@@ -2,10 +2,12 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RendererUtils;
+using UnityEngine.UI;
 
 public class MiniRenderPipeline : RenderPipeline
 {
     private readonly Lighting lighting = new Lighting();
+    private readonly ShadowUtil shadowUtil = new ShadowUtil();
 
     protected override void Render(ScriptableRenderContext context, List<Camera> cameras)
     {
@@ -26,12 +28,17 @@ public class MiniRenderPipeline : RenderPipeline
             return;
         }
 
+        //shadow
+        cullingParameters.shadowDistance = Mathf.Min( 50.0f, camera.farClipPlane);
+
         // 执行剔除
         CullingResults cullingResults = context.Cull(ref cullingParameters);
 
         // 光照
-        lighting.Setup(context, cullingResults);
+        int mainLightIndex = lighting.Setup(context, cullingResults);
 
+        // shadow pass
+        shadowUtil.Render( context, cullingResults, mainLightIndex);
 
         // 设置 Camera GPU 状态
         context.SetupCameraProperties(camera);
@@ -42,11 +49,10 @@ public class MiniRenderPipeline : RenderPipeline
             name = "MiniRP Camera"
         };
 
-        cmd.ClearRenderTarget(
-            true,
-            true,
-            camera.backgroundColor
-        );
+        // 恢复RT，避免覆盖 shadowmap
+        cmd.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
+
+        cmd.ClearRenderTarget(true, true, camera.backgroundColor);
 
         context.ExecuteCommandBuffer(cmd);
 
@@ -60,6 +66,9 @@ public class MiniRenderPipeline : RenderPipeline
 
         //半透明
         DrawTransparent(context, camera, cullingResults);
+
+        //清理 shadow map buffer
+        shadowUtil.Cleanup(context);
 
         // Submit
         context.Submit();

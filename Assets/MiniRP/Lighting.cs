@@ -6,7 +6,7 @@ public class Lighting
     //主光源，平行光
     private static readonly int MainLightDirectionId = Shader.PropertyToID("_MainLightDirection");
 
-    private static readonly int MainLightColorId = Shader.PropertyToID("_MainLightColor");
+    private static readonly int MainLightColorId = Shader.PropertyToID("_MainLightClr");
 
 
     //次光源，暂时只考虑点光源
@@ -25,9 +25,11 @@ public class Lighting
 
     private readonly Vector4[] otherLightParams = new Vector4[MaxOtherLightCount];
 
-
-    public void Setup( ScriptableRenderContext context, CullingResults cullingResults)
+    //返回主光源序号
+    public int Setup( ScriptableRenderContext context, CullingResults cullingResults)
     {
+        int mainLightIndex = -1;
+
         Vector4 lightDirection = Vector4.zero;
         Color lightColor = Color.black;
 
@@ -64,6 +66,7 @@ public class Lighting
 
                     lightColor = visibleLight.finalColor;
 
+                    mainLightIndex = i;
                     findMainLight = true;
                 }
             }
@@ -94,6 +97,8 @@ public class Lighting
         context.ExecuteCommandBuffer(cmd);
 
         cmd.Release();
+
+        return mainLightIndex;
     }
 
 
