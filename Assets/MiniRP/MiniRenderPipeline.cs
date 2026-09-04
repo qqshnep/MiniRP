@@ -47,16 +47,20 @@ public class MiniRenderPipeline : RenderPipeline
         cmd.Release();
 
         // Draw Opaque
-        DrawVisibleGeometry(context, camera, cullingResults);
+        DrawOpaque(context, camera, cullingResults);
 
+        //Skybox
+        DrawSkybox(context, camera);
 
+        //半透明
+        DrawTransparent(context, camera, cullingResults);
 
         // Submit
         context.Submit();
     }
 
 
-    private void DrawVisibleGeometry(ScriptableRenderContext context, Camera camera,CullingResults cullingResults)
+    private void DrawOpaque(ScriptableRenderContext context, Camera camera,CullingResults cullingResults)
     {
         ShaderTagId shaderTagId = new ShaderTagId("MiniRPUnlit");
 
@@ -76,6 +80,61 @@ public class MiniRenderPipeline : RenderPipeline
         CommandBuffer cmd = new CommandBuffer
             {
                 name = "Draw Opaque"
+            };
+
+        cmd.DrawRendererList(rendererList);
+
+        context.ExecuteCommandBuffer(cmd);
+
+        cmd.Release();
+    }
+
+    private void DrawSkybox(ScriptableRenderContext context, Camera camera)
+    {
+        if (camera.clearFlags != CameraClearFlags.Skybox)
+        {
+            return;
+        }
+
+        if (RenderSettings.skybox == null)
+        {
+            return;
+        }
+
+        RendererList skyboxRendererList = context.CreateSkyboxRendererList(camera);
+
+        CommandBuffer cmd = new CommandBuffer
+            {
+                name = "Draw Skybox"
+            };
+
+        cmd.DrawRendererList(skyboxRendererList);
+
+        context.ExecuteCommandBuffer(cmd);
+
+        cmd.Release();
+    }
+
+    private void DrawTransparent(ScriptableRenderContext context, Camera camera, CullingResults cullingResults)
+    {
+        ShaderTagId shaderTagId = new ShaderTagId("MiniRPUnlit");
+
+        RendererListDesc desc = new RendererListDesc(
+                shaderTagId,
+                cullingResults,
+                camera
+            );
+
+        desc.renderQueueRange = RenderQueueRange.transparent;
+
+        //半透明排序
+        desc.sortingCriteria = SortingCriteria.CommonTransparent;
+
+        RendererList rendererList = context.CreateRendererList(desc);
+
+        CommandBuffer cmd = new CommandBuffer
+            {
+                name = "Draw Transparent"
             };
 
         cmd.DrawRendererList(rendererList);
