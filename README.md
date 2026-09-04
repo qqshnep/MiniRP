@@ -1,39 +1,18 @@
 # MiniRP
-## Step01:新增管线
+## Step02:自己做 Culling
 
-### 1. 创建项目
-![image](https://github.com/qqshnep/MiniRP/blob/step01/readme_img/step01/01.jpg)
-   
-### 2. 搭建场景 Plane + Cube
-![image](https://github.com/qqshnep/MiniRP/blob/step01/readme_img/step01/02.png)
-   
-### 3. 创建代码文件 MiniRenderPipelineAsset/MiniRenderPipeline
-只使用 camera 的背景色 清除 buffer
+### 1. MiniRenderPipeline
 ```
-    void RenderCamera(ScriptableRenderContext context, Camera camera)
-    {
-        context.SetupCameraProperties(camera);
+// 1. 获取 Camera 对应的剔除参数
+if (!camera.TryGetCullingParameters(out ScriptableCullingParameters cullingParameters))
+{
+    return;
+}
 
-        CommandBuffer cmd = new CommandBuffer();
-
-        cmd.ClearRenderTarget(
-            true,
-            true,
-            camera.backgroundColor
-        );
-
-        context.ExecuteCommandBuffer(cmd);
-
-        cmd.Release();
-
-        context.Submit();
-    }
+// 2. 执行剔除
+CullingResults cullingResults = context.Cull(ref cullingParameters);
 ```
 
-![image](https://github.com/qqshnep/MiniRP/blob/step01/readme_img/step01/03.png)
-
-### 4. 使用 MiniRenderPipelineAsset
-![image](https://github.com/qqshnep/MiniRP/blob/step01/readme_img/step01/04.png)
-
-### 5. MiniRP 生效
-![image](https://github.com/qqshnep/MiniRP/blob/step01/readme_img/step01/05.png)
+### 2. 没有Drawcall FrameDebugger暂时看不到
+![image](https://github.com/qqshnep/MiniRP/blob/step02/readme_img/step02/01.png)
+   
