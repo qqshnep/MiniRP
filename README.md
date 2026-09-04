@@ -37,4 +37,11 @@
 ### PCF 领域采样
 <img src="https://github.com/qqshnep/MiniRP/blob/step07/readme_img/step07/11.png" width="45%">
 
+### PCF 级联阴影 Cascade shadow
+<img src="https://github.com/qqshnep/MiniRP/blob/step07/readme_img/step07/12.png" width="45%">
+
+
+### 最终效果
+<img src="https://github.com/qqshnep/MiniRP/blob/step07/readme_img/step07/13.png" width="45%">
+
 
