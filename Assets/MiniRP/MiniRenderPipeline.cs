@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEditor.Rendering;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RendererUtils;
@@ -8,6 +9,10 @@ public class MiniRenderPipeline : RenderPipeline
 {
     private readonly Lighting lighting = new Lighting();
     private readonly ShadowUtil shadowUtil = new ShadowUtil();
+
+    private static readonly int CameraColorTextureId = Shader.PropertyToID("_CameraColorTexture");
+    private static readonly int CameraDepthTextureId = Shader.PropertyToID("_CameraDepthTexture");
+    private Material finalBlitMaterial = new Material(Shader.Find("MiniRP/FinalBlit"));
 
     protected override void Render(ScriptableRenderContext context, List<Camera> cameras)
     {
@@ -43,20 +48,8 @@ public class MiniRenderPipeline : RenderPipeline
         // 设置 Camera GPU 状态
         context.SetupCameraProperties(camera);
 
-        // Clear
-        CommandBuffer cmd = new CommandBuffer
-        {
-            name = "MiniRP Camera"
-        };
-
-        // 恢复RT，避免覆盖 shadowmap
-        cmd.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
-
-        cmd.ClearRenderTarget(true, true, camera.backgroundColor);
-
-        context.ExecuteCommandBuffer(cmd);
-
-        cmd.Release();
+        //clear + color rt + depth rt + setTarget
+        SetupCameraTargets(context, camera);
 
         // Draw Opaque
         DrawOpaque(context, camera, cullingResults);
@@ -66,6 +59,10 @@ public class MiniRenderPipeline : RenderPipeline
 
         //半透明
         DrawTransparent(context, camera, cullingResults);
+
+
+        FinalBlit(context);
+        CleanupCameraTargets(context);
 
         //清理 shadow map buffer
         shadowUtil.Cleanup(context);
@@ -153,6 +150,76 @@ public class MiniRenderPipeline : RenderPipeline
             };
 
         cmd.DrawRendererList(rendererList);
+
+        context.ExecuteCommandBuffer(cmd);
+
+        cmd.Release();
+    }
+
+    private void SetupCameraTargets(ScriptableRenderContext context, Camera camera)
+    {
+        CommandBuffer cmd = new CommandBuffer { name = "Setup Camera Targets" };
+
+        cmd.GetTemporaryRT(
+            CameraColorTextureId,
+            camera.pixelWidth,
+            camera.pixelHeight,
+            0,
+            FilterMode.Bilinear,
+            RenderTextureFormat.DefaultHDR //bloom
+        );
+
+        cmd.GetTemporaryRT(
+            CameraDepthTextureId,
+            camera.pixelWidth,
+            camera.pixelHeight,
+            32,
+            FilterMode.Point,
+            RenderTextureFormat.Depth
+        );
+
+        RenderTargetIdentifier colorRT = new RenderTargetIdentifier(CameraColorTextureId);
+        RenderTargetIdentifier depthRT = new RenderTargetIdentifier(CameraDepthTextureId);
+        cmd.SetRenderTarget(colorRT, depthRT);
+        cmd.ClearRenderTarget(true, true, camera.backgroundColor);
+
+        context.ExecuteCommandBuffer(cmd);
+        cmd.Release();
+    }
+
+    private void FinalBlit(ScriptableRenderContext context)
+    {
+        CommandBuffer cmd = new CommandBuffer
+            {
+                name = "MiniRP Final Blit"
+            };
+
+        cmd.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
+
+        cmd.DrawProcedural(
+            Matrix4x4.identity,
+            finalBlitMaterial,
+            0,
+            MeshTopology.Triangles,
+            3,
+            1
+        );
+
+        context.ExecuteCommandBuffer(cmd);
+
+        cmd.Release();
+    }
+
+    private void CleanupCameraTargets(ScriptableRenderContext context)
+    {
+        CommandBuffer cmd = new CommandBuffer
+            {
+                name = "Release Camera Targets"
+            };
+
+        cmd.ReleaseTemporaryRT(CameraColorTextureId);
+
+        cmd.ReleaseTemporaryRT(CameraDepthTextureId);
 
         context.ExecuteCommandBuffer(cmd);
 
