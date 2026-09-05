@@ -3,8 +3,6 @@
 
 # 目录
 ## Step01:接管 Unity 渲染
-<img src="https://github.com/qqshnep/MiniRP/blob/step01/readme_img/step01/05.png" width="50%">
-
 ## Step02:自己做 Culling
 <img src="https://github.com/qqshnep/MiniRP/blob/step02/readme_img/step02/01.png" width="50%">
 
@@ -28,20 +26,21 @@
 <img src="https://github.com/qqshnep/MiniRP/blob/step07/readme_img/step07/06.png" width="45%">
 </p>
 
-### Depth Bias
+### Depth Bias & Normal Bias
+<p>
 <img src="https://github.com/qqshnep/MiniRP/blob/step07/readme_img/step07/04.png" width="45%">
-
-### Normal Bias
 <img src="https://github.com/qqshnep/MiniRP/blob/step07/readme_img/step07/08.png" width="45%">
+</p>
 
-### PCF 领域采样
+### PCF 领域采样 & 级联阴影 Cascade shadow
+<p>
 <img src="https://github.com/qqshnep/MiniRP/blob/step07/readme_img/step07/11.png" width="45%">
-
-### PCF 级联阴影 Cascade shadow
 <img src="https://github.com/qqshnep/MiniRP/blob/step07/readme_img/step07/12.png" width="45%">
-
+</p>
 
 ### 最终效果
 <img src="https://github.com/qqshnep/MiniRP/blob/step07/readme_img/step07/13.png" width="45%">
 
-
+## Step08:离屏渲染
+为后续步骤做准备
+<img src="https://github.com/qqshnep/MiniRP/blob/step08/readme_img/step08/01.png" width="45%">
