@@ -48,3 +48,6 @@
 ## Step09:Depth Prepass
 为后续步骤做准备<br/>
 <img src="https://github.com/qqshnep/MiniRP/blob/step09/readme_img/step09/01.png" width="45%">
+
+## Step10:PostProcess/Bloom+Exposure+ToneMapping
+<img src="https://github.com/qqshnep/MiniRP/blob/step10/readme_img/step10/04.png" width="45%">
