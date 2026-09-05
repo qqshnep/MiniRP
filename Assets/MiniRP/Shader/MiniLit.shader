@@ -15,10 +15,15 @@ Shader "MiniRP/MiniLit"
 
         Pass
         {
+            Name "Forward"
+
             Tags
             {
                 "LightMode" = "MiniRPLit"
             }
+
+            ZTest Equal
+            ZWrite Off
 
             HLSLPROGRAM
 
@@ -234,6 +239,7 @@ Shader "MiniRP/MiniLit"
                 float mainNdotL  = saturate(dot(N, L));
                 float shadow = GetMainLightShadow(input.posWS, input.normalWS, L);
                 float3 lighting = _BaseColor.rgb * _MainLightClr.rgb * mainNdotL * shadow;
+                
 
                 //点光
                 for (int i = 0; i < _OtherLightCount;i++)
@@ -300,6 +306,59 @@ Shader "MiniRP/MiniLit"
 
 
             float4 ShadowFrag() : SV_Target
+            {
+                return 0;
+            }
+
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "DepthOnly"
+
+            Tags
+            {
+                "LightMode" = "DepthOnly"
+            }
+
+            ZWrite On
+            ZTest LEqual
+
+            // 完全不写颜色
+            ColorMask 0
+
+            HLSLPROGRAM
+
+            #pragma vertex DepthVert
+            #pragma fragment DepthFrag
+
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Input.hlsl"
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
+
+            struct Attributes
+            {
+                float3 posOS : POSITION;
+            };
+
+            struct Varyings
+            {
+                float4 posCS : SV_POSITION;
+            };
+
+            Varyings DepthVert(Attributes input)
+            {
+                Varyings output;
+
+                float3 posWS = TransformObjectToWorld(input.posOS);
+
+                output.posCS = TransformWorldToHClip(posWS);
+
+                return output;
+            }
+
+            float4 DepthFrag() : SV_Target
             {
                 return 0;
             }

@@ -18,6 +18,8 @@ Shader "MiniRP/FinalBlit"
             TEXTURE2D(_CameraColorTexture);
             SAMPLER(sampler_CameraColorTexture);
 
+            float4 _BlitScaleBias;
+
             struct Varyings
             {
                 float4 positionCS : SV_POSITION;
@@ -29,8 +31,11 @@ Shader "MiniRP/FinalBlit"
                 Varyings o;
 
                 o.positionCS = GetFullScreenTriangleVertexPosition(vertexID);
-                o.uv = GetFullScreenTriangleTexCoord(vertexID);
-                o.uv.y = 1.0 - o.uv.y; // 翻转
+                
+                float2 uv = GetFullScreenTriangleTexCoord(vertexID);
+                uv = uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
+                o.uv = uv;
+
                 return o;
             }
 
