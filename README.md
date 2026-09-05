@@ -42,5 +42,5 @@
 <img src="https://github.com/qqshnep/MiniRP/blob/step07/readme_img/step07/13.png" width="45%">
 
 ## Step08:离屏渲染
-为后续步骤做准备
+为后续步骤做准备<br/>
 <img src="https://github.com/qqshnep/MiniRP/blob/step08/readme_img/step08/01.png" width="45%">
