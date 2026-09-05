@@ -12,3 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9f7daa98248c62448867c4f4de3a80d9, type: 3}
   m_Name: MiniRenderPipelineAsset
   m_EditorClassIdentifier: Assembly-CSharp::MiniRenderPipelineAsset
+  environmentCubemap: {fileID: 8900000, guid: 656a59a5ff93c46498416d97e5c16b66, type: 3}

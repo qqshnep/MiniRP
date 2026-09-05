@@ -36,6 +36,20 @@ public class MiniRenderPipeline : RenderPipeline
 
     private static readonly int CameraPositionWSId = Shader.PropertyToID( "_CameraPositionWS" );
 
+    private readonly Cubemap environmentCubemap;
+    private static readonly int EnvironmentCubeId = Shader.PropertyToID( "_EnvironmentCube" );
+
+    private static readonly int EnvironmentMipCountId = Shader.PropertyToID( "_EnvironmentMipCount" );
+
+    private Color ambientColor = new Color(0.1f, 0.1f, 0.1f);
+    private static readonly int AmbientColorId = Shader.PropertyToID("_AmbientColor");
+
+
+    public MiniRenderPipeline(Cubemap environmentCubemap)
+    { 
+        this.environmentCubemap = environmentCubemap;
+    }
+
     protected override void Render(ScriptableRenderContext context, List<Camera> cameras)
     {
         foreach (Camera camera in cameras)
@@ -264,6 +278,18 @@ public class MiniRenderPipeline : RenderPipeline
             );
         }
 
+        {
+            if (environmentCubemap != null)
+            {
+                cmd.SetGlobalTexture(EnvironmentCubeId,environmentCubemap);
+
+                cmd.SetGlobalFloat(EnvironmentMipCountId,environmentCubemap.mipmapCount - 1);
+
+                cmd.SetGlobalColor( AmbientColorId, ambientColor );
+            }
+
+        }
+
         context.ExecuteCommandBuffer(cmd);
         cmd.Release();
     }
@@ -382,11 +408,11 @@ public class MiniRenderPipeline : RenderPipeline
         // Source
         cmd.SetGlobalTexture(SourceTextureId, CameraColorTextureId);
         cmd.SetGlobalTexture(BloomTextureId, BloomAId);
-        cmd.SetGlobalFloat(BloomIntensityId, 1.0f);
+        cmd.SetGlobalFloat(BloomIntensityId, 2.0f);
         
 
         // Exposure
-        cmd.SetGlobalFloat(ExposureId, 0.0f);
+        cmd.SetGlobalFloat(ExposureId, 0.8f);
 
         // Final RT = BackBuffer
         cmd.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);

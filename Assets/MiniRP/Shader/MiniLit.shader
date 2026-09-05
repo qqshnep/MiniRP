@@ -116,6 +116,13 @@ Shader "MiniRP/MiniLit"
             int _CascadeCount;
 
 
+            // cubemap
+            TEXTURECUBE(_EnvironmentCube);
+            SAMPLER(sampler_EnvironmentCube);
+
+            float _EnvironmentMipCount;
+            float4 _AmbientColor;
+
             int GetCascadeIndex(float3 positionWS)
             {
                 for (int i = 0; i < _CascadeCount; i++)
@@ -307,6 +314,27 @@ Shader "MiniRP/MiniLit"
                 return brdf * rangeAttenuation;
             }
 
+            float3 EvaluateEnvironmentSpecular(float3 N, float3 V, float3 F0, float roughness)
+            {
+                float3 R = reflect(-V, N);
+
+                float mip = roughness * _EnvironmentMipCount;
+
+                float3 environment = SAMPLE_TEXTURECUBE_LOD(
+                        _EnvironmentCube,
+                        sampler_EnvironmentCube,
+                        R,
+                        mip
+                    ).rgb;
+
+                float NdotV = saturate( dot(N, V) );
+
+                float3 F = FresnelSchlick( NdotV, F0 );
+
+                return environment * F;
+            }
+
+
 
             Varyings Vert(Attributes input)
             {
@@ -356,37 +384,74 @@ Shader "MiniRP/MiniLit"
 
                 float3 N = normalize(input.normalWS);
                 float3 V = normalize( _CameraPositionWS.xyz - input.posWS);
+                float3 L = normalize(_MainLightDirection.xyz);
+
+                //cubemap 测试
+                // {
+                //     float3 R = reflect(-V, N);
+
+                //     float roughness = 1.0 - _Smoothness;
+                //     float mip = roughness * _EnvironmentMipCount;
+                //     //float3 environment = SAMPLE_TEXTURECUBE( _EnvironmentCube, sampler_EnvironmentCube, R ).rgb;
+                //     float3 environment = SAMPLE_TEXTURECUBE_LOD( _EnvironmentCube, sampler_EnvironmentCube, R, mip ).rgb;
+
+                //     return float4(environment, 1);
+                // }
+
+                float baseColor = _BaseColor.rgb;
+                float metallic = _Metallic;
+                float roughness = max( 1.0 - _Smoothness, 0.045 );
+
+                float3 F0 = lerp( float3(0.04, 0.04, 0.04), baseColor, metallic );
+
+
 
                 //平行光
-                float3 L = normalize(_MainLightDirection.xyz);
-                float mainNdotL  = saturate(dot(N, L));
-                float shadow = GetMainLightShadow(input.posWS, input.normalWS, L);
-                //float3 lighting = _BaseColor.rgb * _MainLightClr.rgb * mainNdotL * shadow;
+                float3 directLighting = 0;
+                {
+                    float mainNdotL  = saturate(dot(N, L));
+                    float shadow = GetMainLightShadow(input.posWS, input.normalWS, L);
+                    //float3 lighting = _BaseColor.rgb * _MainLightClr.rgb * mainNdotL * shadow;
+
+                    float3 lighting = EvaluateBRDF(
+                        N,
+                        V,
+                        L,
+                        baseColor,
+                        _BaseColor.rgb,
+                        metallic,
+                        roughness);
+
+                    directLighting = lighting * shadow;
+                }
                 
-                float roughness = 1.0 - _Smoothness;
-                roughness = max( roughness, 0.045 );
-
-                float3 lighting = EvaluateBRDF(
-                    N,
-                    V,
-                    L,
-                    _MainLightClr.rgb,
-                    _BaseColor.rgb,
-                    _Metallic,
-                    roughness);
-
-                lighting *= shadow;
 
                 //点光
-                for (int i = 0; i < _OtherLightCount;i++)
+                float3 pointLighting = 0;
                 {
-                    //lighting += CalculatePointLightPBR( i, input.posWS, N, V, _BaseColor.rgb, _Metallic, roughness);
+                    for (int i = 0; i < _OtherLightCount;i++)
+                    {
+                        pointLighting += CalculatePointLightPBR( i, input.posWS, N, V, _BaseColor.rgb, _Metallic, roughness);
+                    }
+                }
+                
+
+                //间接光
+                float3 indirectDiffuse = 0;
+                float3 indirectSpecular = 0;
+                {
+                    float NdotV = saturate(dot(N, V));
+                    float3 F = FresnelSchlick( NdotV, F0 );
+                    float3 kD = (1.0 - F) * (1.0 - metallic);
+
+                    indirectDiffuse = _AmbientColor.rgb * baseColor * kD;
+
+                    indirectSpecular = EvaluateEnvironmentSpecular( N, V, F0, roughness );
                 }
 
-
-                //float3 color = _BaseColor.rgb * lighting;
+                float3 finalLighting = directLighting + pointLighting + indirectDiffuse + indirectSpecular;
                 
-                return float4( lighting, _BaseColor.a );
+                return float4( finalLighting, _BaseColor.a );
                 
             }
 
