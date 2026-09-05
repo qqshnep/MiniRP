@@ -1,5 +1,4 @@
 # MiniRP
-## Step10:PostProcess/Bloom+Exposure+ToneMapping
-
-![image](https://github.com/qqshnep/MiniRP/blob/step10/readme_img/step10/04.png)
+Step12:PBR/Direct PBR Lighting + Indirect Diff + Indirect Spec
+<img src="https://github.com/qqshnep/MiniRP/blob/step12/readme_img/step12/01.png" width="45%">
 
