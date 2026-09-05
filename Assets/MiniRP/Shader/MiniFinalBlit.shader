@@ -22,7 +22,7 @@ Shader "MiniRP/FinalBlit"
 
             struct Varyings
             {
-                float4 positionCS : SV_POSITION;
+                float4 posCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
             };
 
@@ -30,7 +30,7 @@ Shader "MiniRP/FinalBlit"
             {
                 Varyings o;
 
-                o.positionCS = GetFullScreenTriangleVertexPosition(vertexID);
+                o.posCS = GetFullScreenTriangleVertexPosition(vertexID);
                 
                 float2 uv = GetFullScreenTriangleTexCoord(vertexID);
                 uv = uv * _BlitScaleBias.xy + _BlitScaleBias.zw;

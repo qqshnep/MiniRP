@@ -11,10 +11,20 @@ public class MiniRenderPipeline : RenderPipeline
     private readonly Lighting lighting = new Lighting();
     private readonly ShadowUtil shadowUtil = new ShadowUtil();
 
+    //offline render
     private static readonly int CameraColorTextureId = Shader.PropertyToID("_CameraColorTexture");
     private static readonly int CameraDepthTextureId = Shader.PropertyToID("_CameraDepthTexture");
+
+    //blit
     private Material finalBlitMaterial = new Material(Shader.Find("MiniRP/FinalBlit"));
     private static readonly int BlitScaleBiasId = Shader.PropertyToID("_BlitScaleBias");
+
+    //postprocess
+
+    private Material postProcessMaterial = new Material(Shader.Find("MiniRP/PostProcess"));
+    private static readonly int SourceTextureId = Shader.PropertyToID("_SourceTexture");
+    private static readonly int ExposureId = Shader.PropertyToID("_Exposure");
+
 
     protected override void Render(ScriptableRenderContext context, List<Camera> cameras)
     {
@@ -72,7 +82,8 @@ public class MiniRenderPipeline : RenderPipeline
             DrawTransparent(context, camera, cullingResults);
 
 
-            FinalBlit(context, camera);
+            //FinalBlit(context, camera);
+            PostProcess(context, camera);
         }
 
 
@@ -312,6 +323,48 @@ public class MiniRenderPipeline : RenderPipeline
             };
 
         cmd.DrawRendererList(rendererList);
+
+        context.ExecuteCommandBuffer(cmd);
+
+        cmd.Release();
+    }
+
+
+    private void PostProcess(ScriptableRenderContext context,Camera camera)
+    {
+        if (postProcessMaterial == null)
+        {
+            postProcessMaterial = new Material(Shader.Find("MiniRP/PostProcess"));
+        }
+
+        CommandBuffer cmd = new CommandBuffer
+            {
+                name = "MiniRP Post Process"
+            };
+
+        // Source
+        cmd.SetGlobalTexture(SourceTextureId, CameraColorTextureId);
+
+        // Exposure
+        cmd.SetGlobalFloat(ExposureId, -2.0f);
+
+        // Final RT = BackBuffer
+        cmd.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
+
+        bool needYFlip = SystemInfo.graphicsUVStartsAtTop && camera.targetTexture == null;
+
+        Vector4 scaleBias = needYFlip ? new Vector4(1, -1, 0, 1) : new Vector4(1, 1, 0, 0);
+
+        cmd.SetGlobalVector(BlitScaleBiasId, scaleBias);
+
+        cmd.DrawProcedural(
+            Matrix4x4.identity,
+            postProcessMaterial,
+            0,
+            MeshTopology.Triangles,
+            3,
+            1
+        );
 
         context.ExecuteCommandBuffer(cmd);
 
