@@ -115,7 +115,7 @@ Shader "MiniRP/MiniLit"
 
                     float distanceSquared = dot(offset, offset);
 
-                    if ( distanceSquared < _CascadeCullingSpheres[i].w)
+                    if ( distanceSquared < _CascadeCullingSpheres[i].w) //w 在代码里已经做过乘方
                     {
                         return i;
                     }

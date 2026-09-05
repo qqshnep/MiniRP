@@ -18,6 +18,17 @@ public class ShadowUtil
 
 
     //级联阴影
+    /*
+┌──────────────┬
+│              │            │
+│ Cascade 2    │ Cascade 3  │
+│              │            │
+├──────────────┼
+│              │            │
+│ Cascade 0    │ Cascade 1  │
+│              │            │
+└──────────────┴
+     */
     private const int CascadeCount = 4;
     private const int ShadowAtlasSize = 2048;
     private static readonly Matrix4x4[]  mainLightShadowMatrices = new Matrix4x4[CascadeCount];
@@ -96,7 +107,7 @@ public class ShadowUtil
                     // split count
                     CascadeCount,
 
-                    // 只有一个 cascade，因此暂时没用
+                    // 级联比例 / 分割比例
                     CascadeRatios,
 
                     tileSize,
@@ -115,7 +126,7 @@ public class ShadowUtil
 
             Vector2Int tileOffset = GetTileOffset(cascadeIdx, split);
 
-            //设置 Atlas tile
+            //设置 Atlas tile, 左下角00
             cmd.SetViewport( new Rect(
                     tileOffset.x * tileSize,
                     tileOffset.y * tileSize,
@@ -131,7 +142,7 @@ public class ShadowUtil
             cmd.SetGlobalDepthBias(0.0f, light.shadowBias);
 
             // normal bias
-            float worldTexelSize = 2.0f * splitData.cullingSphere.w / ShadowMapSize;
+            float worldTexelSize = 2.0f * splitData.cullingSphere.w / tileSize;
             float normalBias = light.shadowNormalBias * worldTexelSize;
             cmd.SetGlobalFloat(MainLightShadowNormalBiasId, normalBias);
 
@@ -160,7 +171,7 @@ public class ShadowUtil
 
             // 保存 Matrix + CullingSphere
             Vector4 sphere = splitData.cullingSphere;
-            sphere.w *= sphere.w; //shader 预处理
+            sphere.w *= sphere.w; //shader 预处理, 判断是否在球内，无需再乘方
             cascadeCullingSpheres[cascadeIdx] = sphere;
 
             mainLightShadowMatrices[cascadeIdx] = ConvertToAtlasMatrix(projectionMatrix * viewMatrix,tileOffset,split);
@@ -252,9 +263,9 @@ public class ShadowUtil
     index 3 → (1,1)
 
 ┌───────┬
-│  0    │   1 │
-├───────┼
 │  2    │   3 │
+├───────┼
+│  0    │   1 │
 └───────┴
 
      */
@@ -265,6 +276,28 @@ public class ShadowUtil
             index / split
         );
     }
+
+
+    /*
+Clip XY
+[-1,+1]
+
+↓
+*0.5 + 0.5
+
+Tile UV
+[0,1]
+
+↓
+
+/ split
++
+tile offset / split
+
+↓
+
+Atlas UV
+     */
 
     private static Matrix4x4 ConvertToAtlasMatrix(Matrix4x4 matrix, Vector2Int offset,int split)
     {
