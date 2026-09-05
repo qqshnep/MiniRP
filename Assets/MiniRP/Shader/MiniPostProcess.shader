@@ -26,6 +26,11 @@ Shader "MiniRP/PostProcess"
 
             float _Exposure;
 
+
+            TEXTURE2D(_BloomTexture);
+            SAMPLER(sampler_BloomTexture);
+            float _BloomIntensity;
+
             struct Varyings
             {
                 float4 posCS : SV_POSITION;
@@ -63,9 +68,12 @@ Shader "MiniRP/PostProcess"
 
             float4 Frag(Varyings input) : SV_Target
             {
-                float4 source = SAMPLE_TEXTURE2D(_SourceTexture, sampler_SourceTexture, input.uv);
+                float3 source = SAMPLE_TEXTURE2D(_SourceTexture, sampler_SourceTexture, input.uv).rgb;
 
-                float3 color = source.rgb;
+                float3 bloom = SAMPLE_TEXTURE2D(_BloomTexture, sampler_BloomTexture, input.uv).rgb;
+
+                float3 color = source + bloom * _BloomIntensity;
+
                 //曝光
                 float exposureMultiplier = exp2(_Exposure);
                 color *= exposureMultiplier;
@@ -89,7 +97,8 @@ Shader "MiniRP/PostProcess"
                 //Tone Mapping -- ACES-ish
                 //color = ToneMapACES(color);
 
-                return float4(color, source.a);
+                //return float4(bloom,1);
+                return float4(color, 1);
             }
 
             ENDHLSL

@@ -25,6 +25,13 @@ public class MiniRenderPipeline : RenderPipeline
     private static readonly int SourceTextureId = Shader.PropertyToID("_SourceTexture");
     private static readonly int ExposureId = Shader.PropertyToID("_Exposure");
 
+    private static readonly int BloomAId = Shader.PropertyToID("_BloomA");
+    private static readonly int BloomBId = Shader.PropertyToID("_BloomB");
+    private Material bloomMaterial = new Material(Shader.Find("MiniRP/Bloom"));
+    private static readonly int SourceTextureSizeId = Shader.PropertyToID("_SourceTextureSize");
+    private static readonly int BloomThresholdId = Shader.PropertyToID("_BloomThreshold");
+    private static readonly int BloomTextureId = Shader.PropertyToID("_BloomTexture");
+    private static readonly int BloomIntensityId = Shader.PropertyToID("_BloomIntensity");
 
     protected override void Render(ScriptableRenderContext context, List<Camera> cameras)
     {
@@ -86,6 +93,7 @@ public class MiniRenderPipeline : RenderPipeline
             PostProcess(context, camera);
         }
 
+        CleanupBloomTargets(context);
 
         CleanupCameraTargets(context);
         //清理 shadow map buffer
@@ -332,6 +340,20 @@ public class MiniRenderPipeline : RenderPipeline
 
     private void PostProcess(ScriptableRenderContext context,Camera camera)
     {
+        //Bloom
+        {
+            if (bloomMaterial == null)
+            {
+                bloomMaterial = new Material(Shader.Find("MiniRP/Bloom"));
+            }
+
+            AllocateBloomTargets(context, camera);
+            BloomPrefilter(context, camera);
+            BloomHorizontal(context, camera);
+            BloomVertical(context, camera);
+        }
+
+
         if (postProcessMaterial == null)
         {
             postProcessMaterial = new Material(Shader.Find("MiniRP/PostProcess"));
@@ -344,6 +366,9 @@ public class MiniRenderPipeline : RenderPipeline
 
         // Source
         cmd.SetGlobalTexture(SourceTextureId, CameraColorTextureId);
+        cmd.SetGlobalTexture(BloomTextureId, BloomAId);
+        cmd.SetGlobalFloat(BloomIntensityId, 5.0f);
+        
 
         // Exposure
         cmd.SetGlobalFloat(ExposureId, -2.0f);
@@ -365,6 +390,166 @@ public class MiniRenderPipeline : RenderPipeline
             3,
             1
         );
+
+        context.ExecuteCommandBuffer(cmd);
+
+        cmd.Release();
+    }
+
+
+    private void AllocateBloomTargets(ScriptableRenderContext context, Camera camera)
+    {
+        int width = Mathf.Max(1,camera.pixelWidth / 2);
+
+        int height = Mathf.Max(1,camera.pixelHeight / 2);
+
+        CommandBuffer cmd = new CommandBuffer
+            {
+                name = "Allocate Bloom Targets"
+            };
+
+        cmd.GetTemporaryRT(
+            BloomAId,
+            width,
+            height,
+            0,
+            FilterMode.Bilinear,
+            RenderTextureFormat.DefaultHDR
+        );
+
+        cmd.GetTemporaryRT(
+            BloomBId,
+            width,
+            height,
+            0,
+            FilterMode.Bilinear,
+            RenderTextureFormat.DefaultHDR
+        );
+
+        context.ExecuteCommandBuffer(cmd);
+
+        cmd.Release();
+    }
+
+    private void BloomPrefilter( ScriptableRenderContext context, Camera camera)
+    {
+        CommandBuffer cmd = new CommandBuffer
+            {
+                name = "Bloom Prefilter"
+            };
+
+        cmd.SetGlobalTexture(SourceTextureId,CameraColorTextureId);
+
+        cmd.SetGlobalVector(SourceTextureSizeId,new Vector4(
+                1.0f / camera.pixelWidth,
+                1.0f / camera.pixelHeight,
+                camera.pixelWidth,
+                camera.pixelHeight
+            )
+        );
+
+        cmd.SetGlobalFloat(BloomThresholdId,1.0f);
+
+        cmd.SetRenderTarget(BloomAId);
+
+        cmd.DrawProcedural(
+            Matrix4x4.identity,
+            bloomMaterial,
+            0,      // Pass 0
+            MeshTopology.Triangles,
+            3,
+            1
+        );
+
+        context.ExecuteCommandBuffer(cmd);
+
+        cmd.Release();
+    }
+
+    private void BloomHorizontal( ScriptableRenderContext context, Camera camera)
+    {
+        int width = Mathf.Max(1, camera.pixelWidth / 2);
+
+        int height = Mathf.Max(1, camera.pixelHeight / 2);
+
+        CommandBuffer cmd = new CommandBuffer
+            {
+                name = "Bloom Horizontal"
+            };
+
+        cmd.SetGlobalTexture( SourceTextureId,BloomAId);
+
+        cmd.SetGlobalVector(SourceTextureSizeId,new Vector4(
+                1.0f / width,
+                1.0f / height,
+                width,
+                height
+            )
+        );
+
+        cmd.SetRenderTarget(BloomBId);
+
+        cmd.DrawProcedural(
+            Matrix4x4.identity,
+            bloomMaterial,
+            1,      // Pass 1
+            MeshTopology.Triangles,
+            3,
+            1
+        );
+
+        context.ExecuteCommandBuffer(cmd);
+
+        cmd.Release();
+    }
+
+    private void BloomVertical( ScriptableRenderContext context, Camera camera)
+    {
+        int width = Mathf.Max(1, camera.pixelWidth / 2);
+
+        int height = Mathf.Max(1, camera.pixelHeight / 2);
+
+        CommandBuffer cmd = new CommandBuffer
+            {
+                name = "Bloom Vertical"
+            };
+
+        cmd.SetGlobalTexture( SourceTextureId,BloomBId);
+
+        cmd.SetGlobalVector(SourceTextureSizeId,new Vector4(
+                1.0f / width,
+                1.0f / height,
+                width,
+                height
+            )
+        );
+
+        cmd.SetRenderTarget(BloomAId);
+
+        cmd.DrawProcedural(
+            Matrix4x4.identity,
+            bloomMaterial,
+            2,      // Pass 2
+            MeshTopology.Triangles,
+            3,
+            1
+        );
+
+        context.ExecuteCommandBuffer(cmd);
+
+        cmd.Release();
+    }
+
+    private void CleanupBloomTargets(ScriptableRenderContext context)
+    {
+        CommandBuffer cmd = new CommandBuffer
+            {
+                name = "Release Bloom Targets"
+            };
+
+        cmd.ReleaseTemporaryRT(BloomAId);
+
+        cmd.ReleaseTemporaryRT(BloomBId);
 
         context.ExecuteCommandBuffer(cmd);
 
