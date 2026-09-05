@@ -33,6 +33,9 @@ public class MiniRenderPipeline : RenderPipeline
     private static readonly int BloomTextureId = Shader.PropertyToID("_BloomTexture");
     private static readonly int BloomIntensityId = Shader.PropertyToID("_BloomIntensity");
 
+
+    private static readonly int CameraPositionWSId = Shader.PropertyToID( "_CameraPositionWS" );
+
     protected override void Render(ScriptableRenderContext context, List<Camera> cameras)
     {
         foreach (Camera camera in cameras)
@@ -249,6 +252,18 @@ public class MiniRenderPipeline : RenderPipeline
         cmd.SetRenderTarget(colorRT, depthRT);
         cmd.ClearRenderTarget(false, true, Color.black);// 不清 Depth！
 
+        {
+            Vector3 cameraPos = camera.transform.position;
+
+            cmd.SetGlobalVector( CameraPositionWSId, new Vector4(
+                    cameraPos.x,
+                    cameraPos.y,
+                    cameraPos.z,
+                    1.0f
+                )
+            );
+        }
+
         context.ExecuteCommandBuffer(cmd);
         cmd.Release();
     }
@@ -367,11 +382,11 @@ public class MiniRenderPipeline : RenderPipeline
         // Source
         cmd.SetGlobalTexture(SourceTextureId, CameraColorTextureId);
         cmd.SetGlobalTexture(BloomTextureId, BloomAId);
-        cmd.SetGlobalFloat(BloomIntensityId, 5.0f);
+        cmd.SetGlobalFloat(BloomIntensityId, 1.0f);
         
 
         // Exposure
-        cmd.SetGlobalFloat(ExposureId, -2.0f);
+        cmd.SetGlobalFloat(ExposureId, 0.0f);
 
         // Final RT = BackBuffer
         cmd.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);

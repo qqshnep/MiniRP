@@ -3,6 +3,8 @@ Shader "MiniRP/MiniLit"
     Properties
     {
         _BaseColor ("Base Color", Color) = (1, 1, 1, 1)
+        _Metallic ("Metallic", Range(0,1)) = 0
+        _Smoothness ( "Smoothness",Range(0,1)) = 0.5
     }
 
     SubShader
@@ -57,6 +59,8 @@ Shader "MiniRP/MiniLit"
             CBUFFER_START(UnityPerMaterial)
 
             float4 _BaseColor;
+            float _Metallic;
+            float _Smoothness;
 
             CBUFFER_END
 
@@ -64,7 +68,7 @@ Shader "MiniRP/MiniLit"
             // =========================
             // Pipeline Global Data
             // =========================
-
+            float4 _CameraPositionWS;
             float4 _MainLightDirection;
             float4 _MainLightClr;
 
@@ -185,6 +189,124 @@ Shader "MiniRP/MiniLit"
             }
 
 
+            //BRDF=漫反射 (Diffuse)+镜面反射 (Specular)
+            /*
+                             D × F × G
+                Specular = ────────
+                           4(N·L)(N·V)
+            
+            */
+
+            float3 FresnelSchlick(float cosTheta, float3 F0)
+            {
+                return F0 + (1.0 - F0) * pow( 1.0 - cosTheta, 5.0 );
+            }
+
+            float DistributionGGX(float NdotH,float roughness)
+            {
+                float a = roughness * roughness;
+
+                float a2 = a * a;
+
+                float NdotH2 = NdotH * NdotH;
+
+                float denominator = NdotH2 * (a2 - 1.0) + 1.0;
+
+                denominator = PI * denominator * denominator;
+
+                return a2 / max( denominator, 0.00001 );
+            }
+
+            float GeometrySchlickGGX( float NdotX, float roughness)
+            {
+                float r = roughness + 1.0;
+
+                float k = (r * r) / 8.0;
+
+                return NdotX / ( NdotX * (1.0 - k) + k );
+            }
+
+            float GeometrySmith( float NdotV, float NdotL, float roughness)
+            {
+                float ggxV = GeometrySchlickGGX( NdotV, roughness );
+
+                float ggxL = GeometrySchlickGGX( NdotL, roughness );
+
+                return ggxV * ggxL;
+            }
+
+            float3 EvaluateBRDF( float3 N, float3 V, float3 L, float3 lightColor, float3 baseColor, float metallic, float roughness)
+            {
+                float3 H = normalize(L + V);
+
+                float NdotL = saturate(dot(N, L));
+
+                float NdotV = saturate(dot(N, V));
+
+                float NdotH = saturate(dot(N, H));
+
+                float VdotH = saturate(dot(V, H));
+
+
+                if ( NdotL <= 0.0 || NdotV <= 0.0)
+                {
+                    return 0;
+                }
+
+
+                float3 F0 = lerp( float3( 0.04, 0.04, 0.04 ), baseColor, metallic );
+
+
+                float D = DistributionGGX( NdotH, roughness );
+
+                float3 F = FresnelSchlick( VdotH, F0 );
+
+                float G = GeometrySmith( NdotV, NdotL, roughness );
+
+
+                float3 numerator = D * G * F;
+
+                float denominator = 4.0 * NdotV * NdotL;
+
+                float3 specular = numerator / max( denominator, 0.00001 );
+
+
+                float3 kS = F;
+
+                float3 kD = (1.0 - kS) * (1.0 - metallic);
+
+                float3 diffuse = kD * baseColor / PI;
+
+
+                return ( diffuse + specular ) * lightColor * NdotL;
+            }
+
+            float3 CalculatePointLightPBR(int lightIndex, float3 positionWS, float3 N, float3 V, float3 basecolor, float metallic, float roughness)
+            {
+                float3 lightPositionWS = _OtherLightPositions[lightIndex].xyz;
+                float3 toLight = lightPositionWS - positionWS;
+                float3 L = normalize(toLight);
+
+                float3 lightColor = _OtherLightColors[lightIndex].rgb;
+                float3 brdf = EvaluateBRDF(
+                    N,
+                    V,
+                    L,
+                    lightColor,
+                    basecolor,
+                    metallic,
+                    roughness);
+
+                //衰减计算
+                float distanceSquared = max( dot(toLight, toLight), 0.00001);
+                float inverseRangeSquared = _OtherLightParams[lightIndex].x;
+
+                float rangeAttenuation = saturate(1.0 - distanceSquared * inverseRangeSquared);
+                rangeAttenuation *= rangeAttenuation;
+
+                return brdf * rangeAttenuation;
+            }
+
 
             Varyings Vert(Attributes input)
             {
@@ -233,24 +355,39 @@ Shader "MiniRP/MiniLit"
 
 
                 float3 N = normalize(input.normalWS);
+                float3 V = normalize( _CameraPositionWS.xyz - input.posWS);
 
                 //平行光
                 float3 L = normalize(_MainLightDirection.xyz);
                 float mainNdotL  = saturate(dot(N, L));
                 float shadow = GetMainLightShadow(input.posWS, input.normalWS, L);
-                float3 lighting = _BaseColor.rgb * _MainLightClr.rgb * mainNdotL * shadow;
+                //float3 lighting = _BaseColor.rgb * _MainLightClr.rgb * mainNdotL * shadow;
                 
+                float roughness = 1.0 - _Smoothness;
+                roughness = max( roughness, 0.045 );
+
+                float3 lighting = EvaluateBRDF(
+                    N,
+                    V,
+                    L,
+                    _MainLightClr.rgb,
+                    _BaseColor.rgb,
+                    _Metallic,
+                    roughness);
+
+                lighting *= shadow;
 
                 //点光
                 for (int i = 0; i < _OtherLightCount;i++)
                 {
-                    lighting += CalculatePointLight( i, input.posWS, N);
+                    //lighting += CalculatePointLightPBR( i, input.posWS, N, V, _BaseColor.rgb, _Metallic, roughness);
                 }
 
 
-                float3 color = _BaseColor.rgb * lighting;
-
-                return float4( color, _BaseColor.a );
+                //float3 color = _BaseColor.rgb * lighting;
+                
+                return float4( lighting, _BaseColor.a );
+                
             }
 
             ENDHLSL

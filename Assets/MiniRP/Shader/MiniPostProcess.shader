@@ -69,7 +69,7 @@ Shader "MiniRP/PostProcess"
             float4 Frag(Varyings input) : SV_Target
             {
                 float3 source = SAMPLE_TEXTURE2D(_SourceTexture, sampler_SourceTexture, input.uv).rgb;
-
+                
                 float3 bloom = SAMPLE_TEXTURE2D(_BloomTexture, sampler_BloomTexture, input.uv).rgb;
 
                 float3 color = source + bloom * _BloomIntensity;
@@ -92,10 +92,10 @@ Shader "MiniRP/PostProcess"
 
 
                 //Tone Mapping -- Reinhard
-                color = color / (1 + color);
+                //color = color / (1 + color);
 
                 //Tone Mapping -- ACES-ish
-                //color = ToneMapACES(color);
+                color = ToneMapACES(color);
 
                 //return float4(bloom,1);
                 return float4(color, 1);
